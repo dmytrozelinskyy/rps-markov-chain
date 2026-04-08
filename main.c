@@ -358,6 +358,14 @@ int main()
     }
     printf("]\n");
 
+    // -- Writing into file -- //
+    FILE *f = fopen("results.txt", "w");
+    for (int i = 0; i < 1000; i++) {
+        fprintf(f, "%d %d\n", static_history[i], learning_history[i]);
+    }
+    fclose(f);
+    system("python3 plot.py");
+
     // -- Free allocated memory -- //
     map2d_free(&static_matrix);
     free(static_history);
