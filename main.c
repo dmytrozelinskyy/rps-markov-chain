@@ -12,6 +12,7 @@ typedef struct {
 typedef struct {
     int width;
     int height;
+    char **keys;
     Map *data;
 } Map2D;
 
@@ -53,7 +54,7 @@ void map_resize(Map* map) {
     }
 }
 
-void map_put(Map* map, const char* key, void* value) {
+void map_put(Map* map, char* key, void* value) {
     for (int i =0; i < map->size; i++) {
         if(strcmp(map->keys[i], key) == 0) {
             map->values[i] = value;
@@ -71,7 +72,7 @@ void map_put(Map* map, const char* key, void* value) {
     map->size++;
 }
 
-void* map_get(Map* map, const char* key) {
+void* map_get(Map* map, char* key) {
     for (int i = 0; i < map->size; i++) {
         if (strcmp(map->keys[i], key) == 0) {
             return map->values[i];
@@ -108,7 +109,8 @@ void map2d_init(Map2D *map2d, int width, int height, int map2d_capacity) {
     map2d->height = height;
     map2d->width = width;
     map2d->data = malloc(sizeof(Map) * height);
-    if (!map2d->data) {
+    map2d->keys = malloc(sizeof(char*) * height);
+    if (!map2d->data || !map2d->keys) {
         printf("Memory allocation failed\n");
         exit(1);
     }
@@ -118,20 +120,21 @@ void map2d_init(Map2D *map2d, int width, int height, int map2d_capacity) {
     }
 }
 
-void map2d_put(Map2D *map2d, int row, const char* key, void* value) {
-    if (row < 0 || row > map2d->height) {
+void map2d_put(Map2D *map2d, int row, char* key2d, const char* key, void* value) {
+    if (row < 0 || row >= map2d->height) {
         printf("Row out of bounds!\n");
         return;
     }
-
+    map2d->keys[row] = key2d;
     map_put(&map2d->data[row], key, value);
 }
 
-void map2d_put_map(Map2D *map2d, int row, Map *input_map) {
-    if (row < 0 || row > map2d->height) {
+void map2d_put_map(Map2D *map2d, int row, char* key, Map *input_map) {
+    if (row < 0 || row >= map2d->height) {
         printf("Row out of bounds!\n");
         return;
     }
+    map2d->keys[row] = key;
     for (int i = 0; i < input_map->size; i++) {
         map_put(&map2d->data[row], input_map->keys[i], input_map->values[i]);
     }
@@ -147,6 +150,7 @@ void* map2d_get(Map2D* map2d, const char* key) {
 
 void print_map2d(Map2D* map2d) {
     for (int i = 0; i < map2d->height; i++) {
+        printf("[%s]\n", map2d->keys[i]);
         print_map(&map2d->data[i]);
     }
 }
@@ -155,12 +159,17 @@ void map2d_free(Map2D* map2d) {
     if(!map2d || !map2d->data) return;
 
     for (int i = 0; i < map2d->height; i++) {
-        map_free(&map2d->data[i]);
+        Map *row = &map2d->data[i];
+        for (int j = 0; j < row->size; j++) {
+            free(row->values[j]);
+        }
+        map_free(row);
     }
 
     free(map2d->data);
+    free(map2d->keys);
     map2d->data = NULL;
-
+    map2d->keys = NULL;
     map2d->height = 0;
     map2d->width = 0;
 }
@@ -180,8 +189,6 @@ void set_static_matrix() {
     map_put(&paper_map, "Rock",  paper_r);
     map_put(&paper_map, "Scissors", paper_s);
 
-    print_map(&paper_map);
-
     // -- Rock vs Others Map -- //
     Map rock_map;
     map_init(&rock_map);
@@ -195,8 +202,6 @@ void set_static_matrix() {
     map_put(&rock_map, "Paper", rock_p);
     map_put(&rock_map, "Rock",  rock_r);
     map_put(&rock_map, "Scissors", rock_s);
-
-    print_map(&rock_map);
 
     // -- Scissors vs Others Map -- //
     Map scissors_map;
@@ -212,14 +217,12 @@ void set_static_matrix() {
     map_put(&scissors_map, "Rock",  scissors_r);
     map_put(&scissors_map, "Scissors", scissors_s);
 
-    print_map(&scissors_map);
-
     // -- Initializing 2D Map -- //
     Map2D st_matrix;
     map2d_init(&st_matrix, 3, 3, 9);
-    map2d_put_map(&st_matrix, 0, &paper_map);
-    map2d_put_map(&st_matrix, 1, &rock_map);
-    map2d_put_map(&st_matrix, 2, &scissors_map);
+    map2d_put_map(&st_matrix, 0, "Paper", &paper_map);
+    map2d_put_map(&st_matrix, 1, "Rock", &rock_map);
+    map2d_put_map(&st_matrix, 2, "Scissors", &scissors_map);
 
     print_map2d(&st_matrix);
 
