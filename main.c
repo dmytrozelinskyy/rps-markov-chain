@@ -140,7 +140,7 @@ void map2d_put_map(Map2D *map2d, int row, char* key, Map *input_map) {
     }
 }
 
-void* map2d_get(Map2D* map2d, const char* key) {
+void* map2d_get(Map2D *map2d, const char* key) {
     void* res;
     for (int i = 0; i < map2d->height; i++) {
         res = map_get(&map2d->data[i], key);
@@ -148,14 +148,25 @@ void* map2d_get(Map2D* map2d, const char* key) {
     return res;
 }
 
-void print_map2d(Map2D* map2d) {
+Map* map2d_get_row(Map2D *map2d, const char* key) {
+    Map* result_map;
+    for (int i = 0; i < map2d->height; i++) {
+        if (strcmp(map2d->keys[i], key) == 0) {
+            result_map = &map2d->data[i];
+            return result_map;
+        }
+    }
+    return NULL;
+}
+
+void print_map2d(Map2D *map2d) {
     for (int i = 0; i < map2d->height; i++) {
         printf("[%s]\n", map2d->keys[i]);
         print_map(&map2d->data[i]);
     }
 }
 
-void map2d_free(Map2D* map2d) {
+void map2d_free(Map2D *map2d) {
     if(!map2d || !map2d->data) return;
 
     for (int i = 0; i < map2d->height; i++) {
@@ -174,7 +185,7 @@ void map2d_free(Map2D* map2d) {
     map2d->width = 0;
 }
 
-void set_static_matrix() {
+void set_static_matrix(Map2D *st_matrix) {
     // -- Paper vs Others Map -- //
     Map paper_map;
     map_init(&paper_map);
@@ -217,23 +228,62 @@ void set_static_matrix() {
     map_put(&scissors_map, "Rock",  scissors_r);
     map_put(&scissors_map, "Scissors", scissors_s);
 
-    // -- Initializing 2D Map -- //
-    Map2D st_matrix;
-    map2d_init(&st_matrix, 3, 3, 9);
-    map2d_put_map(&st_matrix, 0, "Paper", &paper_map);
-    map2d_put_map(&st_matrix, 1, "Rock", &rock_map);
-    map2d_put_map(&st_matrix, 2, "Scissors", &scissors_map);
+    // -- Initializing 2D Map -- /
+    map2d_init(st_matrix, 3, 3, 9);
+    map2d_put_map(st_matrix, 0, "Paper", &paper_map);
+    map2d_put_map(st_matrix, 1, "Rock", &rock_map);
+    map2d_put_map(st_matrix, 2, "Scissors", &scissors_map);
 
-    print_map2d(&st_matrix);
+    print_map2d(st_matrix);
+}
 
-    map2d_free(&st_matrix);
-    map_free(&paper_map);
-    map_free(&rock_map);
-    map_free(&scissors_map);
+int score(char* static_move, char* learning_move) {
+    int reward = 0;
+    if (strcmp(static_move, learning_move) == 0) { reward = 0; }
+    else if ((strcmp(static_move, "Paper") == 0 && strcmp(learning_move, "Rock") == 0) ||
+        (strcmp(static_move, "Scissors") == 0 && strcmp(learning_move, "Paper") == 0) ||
+        (strcmp(static_move, "Rock") == 0 && strcmp(learning_move, "Scissors") == 0)) { reward = 1; }
+    else { reward = -1; }
+    return reward;
+}
+
+const char* weighted_random_choice(Map *row) {
+    float r = (float)rand() / RAND_MAX;
+
+    float cumulative = 0.0f;
+    for (int i = 0; i < row->size; i++) {
+        cumulative += *(float *)row->values[i];
+        if (r <= cumulative) {
+            return row->keys[i];
+        }
+    }
+    return row->keys[row->size - 1];
+}
+
+const char* static_player(const char* last_move, Map2D *static_matrix) {
+    Map* row;
+    row = map2d_get_row(static_matrix, last_move);
+    if(!row) {
+        printf("Something went wrong!\n");
+        exit(-1);
+    }
+    return weighted_random_choice(row);
 }
 
 int main()
 {
-    set_static_matrix();
+    srand(time(NULL));
+    const char* states = {"Paper", "Rock", "Scissors"};
+
+    printf("Reward: %d\n", score("Paper", "Scissors "));
+
+    Map2D static_matrix;
+    set_static_matrix(&static_matrix);
+    // -- Check static player move -- //
+    const char *next_move = static_player("Paper", &static_matrix);
+    printf(":%s", next_move);
+
+    // -- Free allocated memory -- //
+    map2d_free(&static_matrix);
     return 0;
 }
