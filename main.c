@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 typedef struct {
     char **keys;
@@ -16,6 +17,7 @@ typedef struct {
     Map *data;
 } Map2D;
 
+// -- Map Functions -- //
 void map_init(Map* map) {
     map->size = 0;
     map->capacity = 4;
@@ -54,7 +56,7 @@ void map_resize(Map* map) {
     }
 }
 
-void map_put(Map* map, char* key, void* value) {
+void map_put(Map* map, const char* key, void* value) {
     for (int i =0; i < map->size; i++) {
         if(strcmp(map->keys[i], key) == 0) {
             map->values[i] = value;
@@ -72,7 +74,7 @@ void map_put(Map* map, char* key, void* value) {
     map->size++;
 }
 
-void* map_get(Map* map, char* key) {
+void* map_get(Map* map, const char* key) {
     for (int i = 0; i < map->size; i++) {
         if (strcmp(map->keys[i], key) == 0) {
             return map->values[i];
@@ -120,16 +122,17 @@ void map2d_init(Map2D *map2d, int width, int height, int map2d_capacity) {
     }
 }
 
-void map2d_put(Map2D *map2d, int row, char* key2d, const char* key, void* value) {
-    if (row < 0 || row >= map2d->height) {
-        printf("Row out of bounds!\n");
-        return;
+void map2d_put(Map2D *map2d, const char* key2d, const char* key, void* value) {
+    for (int i = 0; i < map2d->height; i++) {
+        if (strcmp(map2d->keys[i], key2d) == 0) {
+            map_put(&map2d->data[i], key, value);
+            return;
+        }
     }
-    map2d->keys[row] = key2d;
-    map_put(&map2d->data[row], key, value);
+    printf("Row key not found: %s\n", key2d);
 }
 
-void map2d_put_map(Map2D *map2d, int row, char* key, Map *input_map) {
+void map2d_put_map(Map2D *map2d, int row, const char* key, Map *input_map) {
     if (row < 0 || row >= map2d->height) {
         printf("Row out of bounds!\n");
         return;
@@ -159,6 +162,25 @@ Map* map2d_get_row(Map2D *map2d, const char* key) {
     return NULL;
 }
 
+Map2D map2d_copy(const Map2D *map2d) {
+    Map2D output_map;
+    map2d_init(&output_map, map2d->width, map2d->height, (map2d->height * map2d->width));
+
+    for (int i = 0; i < map2d->height; i++) {
+        output_map.keys[i] = map2d->keys[i];
+
+        Map *map2d_row = &map2d->data[i];
+        for (int j = 0; j < map2d_row->size; j++) {
+            float *new_val = malloc(sizeof(float));
+            *new_val = *(float*)map2d_row->values[j];
+
+            map_put(&output_map.data[i], map2d_row->keys[j], new_val);
+        }
+    }
+
+    return output_map;
+}
+
 void print_map2d(Map2D *map2d) {
     for (int i = 0; i < map2d->height; i++) {
         printf("[%s]\n", map2d->keys[i]);
@@ -185,6 +207,8 @@ void map2d_free(Map2D *map2d) {
     map2d->width = 0;
 }
 
+
+// -- Main Game Logic -- //
 void set_static_matrix(Map2D *st_matrix) {
     // -- Paper vs Others Map -- //
     Map paper_map;
@@ -237,7 +261,7 @@ void set_static_matrix(Map2D *st_matrix) {
     print_map2d(st_matrix);
 }
 
-int score(char* static_move, char* learning_move) {
+int scores(const char* static_move, const char* learning_move) {
     int reward = 0;
     if (strcmp(static_move, learning_move) == 0) { reward = 0; }
     else if ((strcmp(static_move, "Paper") == 0 && strcmp(learning_move, "Rock") == 0) ||
@@ -261,29 +285,83 @@ const char* weighted_random_choice(Map *row) {
 }
 
 const char* static_player(const char* last_move, Map2D *static_matrix) {
-    Map* row;
-    row = map2d_get_row(static_matrix, last_move);
-    if(!row) {
+    Map* row_map;
+    row_map = map2d_get_row(static_matrix, last_move);
+    if(!row_map) {
         printf("Something went wrong!\n");
         exit(-1);
     }
-    return weighted_random_choice(row);
+    return weighted_random_choice(row_map);
+}
+
+const char* learning_player(const char* last_move, const char* op_last_move, int reward, Map2D *transition_matrix) {
+    Map* row_map = map2d_get_row(transition_matrix, op_last_move);
+    if(!row_map) {
+        printf("Something went wrong!\n");
+        exit(-1);
+    }
+    float *old_value = (float*)map_get(row_map, last_move);
+    *old_value = fmaxf(*old_value += (reward * *old_value * 0.9), 1e-6f);
+
+    float sum = 0.0f;
+    for (int i = 0; i < row_map->size; i++) {
+        sum += *(float*)row_map->values[i];
+    }
+    for (int i = 0; i < row_map->size; i++) {
+        *(float*)row_map->values[i] /= sum;
+    }
+
+    return weighted_random_choice(row_map);
 }
 
 int main()
 {
     srand(time(NULL));
-    const char* states = {"Paper", "Rock", "Scissors"};
-
-    printf("Reward: %d\n", score("Paper", "Scissors "));
-
     Map2D static_matrix;
     set_static_matrix(&static_matrix);
-    // -- Check static player move -- //
-    const char *next_move = static_player("Paper", &static_matrix);
-    printf(":%s", next_move);
+    Map2D learning_matrix = map2d_copy(&static_matrix);
+    const char* states[] = {"Paper", "Rock", "Scissors"};
+
+    const char* static_move = states[rand() % 3];
+    const char* learning_move = static_move;
+    int *static_history = malloc(sizeof(int) * 1000);
+    int *learning_history = malloc(sizeof(int) * 1000);
+    int score = scores(static_move, learning_move);
+    int static_reward = score;
+    int learning_reward = -score;
+
+    for (int i = 0; i < 1000; i++) {
+        const char* last_static_move = static_move;
+        const char* last_learning_move = learning_move;
+
+
+        static_move = static_player(last_static_move, &static_matrix);
+
+        learning_move = learning_player(last_learning_move, last_static_move, learning_reward, &learning_matrix);
+
+        score = scores(static_move, learning_move);
+        static_reward = score;
+        learning_reward = -score;
+
+        static_history[i] = score;
+        learning_history[i] = -score;
+    }
+    printf("Static History:\n[");
+    for (int i = 0; i < 1000; i++) {
+        printf("%d", static_history[i]);
+        if (i < 1000 - 1) printf(", ");
+    }
+    printf("]\nLearning History:\n[");
+    for (int i = 0; i < 1000; i++) {
+        printf("%d", learning_history[i]);
+        if (i < 1000 - 1) printf(", ");
+    }
+    printf("]\n");
 
     // -- Free allocated memory -- //
     map2d_free(&static_matrix);
+    free(static_history);
+    free(learning_history);
+    map2d_free(&learning_matrix);
     return 0;
 }
