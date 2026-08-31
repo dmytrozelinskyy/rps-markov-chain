@@ -316,6 +316,7 @@ const char* learning_player(const char* last_move, const char* op_last_move, int
 
 int main()
 {
+    int num_of_experiments = 5000;
     srand(time(NULL));
     Map2D static_matrix;
     set_static_matrix(&static_matrix);
@@ -324,13 +325,13 @@ int main()
 
     const char* static_move = states[rand() % 3];
     const char* learning_move = static_move;
-    int *static_history = malloc(sizeof(int) * 1000);
-    int *learning_history = malloc(sizeof(int) * 1000);
+    int *static_history = malloc(sizeof(int) * num_of_experiments);
+    int *learning_history = malloc(sizeof(int) * num_of_experiments);
     int score = scores(static_move, learning_move);
     int static_reward = score;
     int learning_reward = -score;
 
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < num_of_experiments; i++) {
         const char* last_static_move = static_move;
         const char* last_learning_move = learning_move;
 
@@ -347,20 +348,20 @@ int main()
         learning_history[i] = -score;
     }
     printf("Static History:\n[");
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < num_of_experiments; i++) {
         printf("%d", static_history[i]);
-        if (i < 1000 - 1) printf(", ");
+        if (i < num_of_experiments - 1) printf(", ");
     }
     printf("]\nLearning History:\n[");
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < num_of_experiments; i++) {
         printf("%d", learning_history[i]);
-        if (i < 1000 - 1) printf(", ");
+        if (i < num_of_experiments - 1) printf(", ");
     }
     printf("]\n");
 
     // -- Writing into file -- //
     FILE *f = fopen("results.txt", "w");
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < num_of_experiments; i++) {
         fprintf(f, "%d %d\n", static_history[i], learning_history[i]);
     }
     fclose(f);

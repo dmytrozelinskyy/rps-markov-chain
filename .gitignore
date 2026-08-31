@@ -42,6 +42,7 @@
 *.idb
 *.pdb
 
+<<<<<<< Updated upstream
 # Kernel Module Compile Results
 *.mod*
 *.cmd
@@ -53,4 +54,12 @@ dkms.conf
 
 # debug information files
 *.dwo
-".vscode/" 
+.vscode/ 
+=======
+# Python 
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.egg-info/
+>>>>>>> Stashed changes
